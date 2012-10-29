@@ -1,0 +1,11 @@
+name: SmoothElevator
+main: org.zzl.minegaming.SmoothElevator.Plugin
+version: 0.1
+description: The Elevator Plugin that's smooth as ice!
+load: STARTUP
+author: shinyquagsire23
+commands:
+   se:
+      description: Opens SmoothElevator Help
+      usage: /se
+softdepend: [Vault, PermissionsEX]
