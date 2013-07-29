@@ -8,4 +8,5 @@ commands:
    se:
       description: Opens SmoothElevator Help
       usage: /se
+depend: [SQLibrary]
 softdepend: [Vault, PermissionsEX]

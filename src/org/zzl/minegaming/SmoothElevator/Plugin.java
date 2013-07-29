@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import net.minecraft.server.EntityFallingBlock;
-import net.minecraft.server.WorldServer;
+import net.minecraft.server.v1_6_R1.EntityFallingBlock;
+import net.minecraft.server.v1_6_R1.WorldServer;
 
 import org.apache.commons.lang.Validate;
 import org.bukkit.Bukkit;
@@ -21,8 +21,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.craftbukkit.CraftWorld;
-import org.bukkit.craftbukkit.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_6_R1.CraftWorld;
+import org.bukkit.craftbukkit.v1_6_R1.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -52,32 +52,45 @@ public class Plugin extends JavaPlugin implements Listener
 		log = getLogger();
         mysql = new SQLite(getLogger(),
                 "[SmoothElevator]",
-                "sqlite",
-                this.getDataFolder().getAbsolutePath());
+                this.getDataFolder().getAbsolutePath(),
+                "sqlite");
         try {
             mysql.open();
 			mysql.createTable("CREATE TABLE IF NOT EXISTS elevators (X INTEGER, Y INTEGER, Z INTEGER, World TEXT, X1 INTEGER, Y1 INTEGER, Z1 INTEGER, X2 INTEGER, Y2 INTEGER, Z2 INTEGER, X3 INTEGER, Y3 INTEGER, Z3 INTEGER, X4 INTEGER, Y4 INTEGER, Z4 INTEGER, X5 INTEGER, Y5 INTEGER, Z5 INTEGER, type INTEGER, height INTEGER, wait DOUBLE, waittop DOUBLE, speed DOUBLE )");
         } catch (Exception e) {
             log.info(e.getMessage());
         }
+        registerEntityType(FloatingBlock.class, "FallingBlock", 21);
         
-        try{
+        Bukkit.getServer().getPluginManager().registerEvents(this, this);
+	}
+	
+	/**
+	 * Registers custom entity class at the native minecraft entity enum
+	 * 
+	 * @param inClass	class of the entity
+	 * @param name		minecraft entity name
+	 * @param inID		minecraft entity id
+	 */
+	public static void registerEntityType(Class<?> inClass, String name, int inID)
+	{
+		try
+		{
             @SuppressWarnings("rawtypes")
             Class[] args = new Class[3];
             args[0] = Class.class;
             args[1] = String.class;
             args[2] = int.class;
  
-            Method a = net.minecraft.server.EntityTypes.class.getDeclaredMethod("a", args);
+            Method a = net.minecraft.server.v1_6_R1.EntityTypes.class.getDeclaredMethod("a", args);
             a.setAccessible(true);
  
-            a.invoke(a, FloatingBlock.class, "FallingSand", 21);
-        }catch (Exception e){
-            e.printStackTrace();
-            this.setEnabled(false);
+            a.invoke(a, inClass, name, inID);
         }
-        
-        Bukkit.getServer().getPluginManager().registerEvents(this, this);
+		catch (Exception e)
+		{
+            e.printStackTrace();
+        }
 	}
 	
 	private boolean setupVaultPermissions() 
@@ -147,7 +160,7 @@ public class Plugin extends JavaPlugin implements Listener
 			if(args.length == 0)
 			{
 				//This guy needs some help!
-				sender.sendMessage("");
+				sender.sendMessage("Usage: /se create <type> <height>");
 			}
 			if(args.length > 0)
 			{
@@ -197,6 +210,7 @@ public class Plugin extends JavaPlugin implements Listener
 					if(sender instanceof Player)
 					{
 						player = (Player) sender;
+						player.leaveVehicle();
 						world = player.getWorld().getName();
 					}
 					else
@@ -210,7 +224,9 @@ public class Plugin extends JavaPlugin implements Listener
 					{
 						if(e instanceof FloatingBlock || e instanceof EntityFallingBlock)
 						{
+							e.eject();
 							e.remove();
+							e.teleport(new Location(e.getWorld(),0,0,0));
 						}
 					}
 				}
@@ -396,6 +412,7 @@ public class Plugin extends JavaPlugin implements Listener
 		FloatingBlock f = spawnFallingBlock(l, idd, data);
 		ElevatorChecker ele = new ElevatorChecker(0,f,height + 1,l);
 		ele.speed = speed;
+		System.out.println(f.getBlockId() + ", " + Material.LADDER.getId());
 		int id = getServer().getScheduler().scheduleSyncRepeatingTask(this, ele, 0L,1L);
 		ele.id = id;
 	}
@@ -430,7 +447,6 @@ public class Plugin extends JavaPlugin implements Listener
 		
 		public void run() 
 		{
-			//System.out.println("ElevatorChecker started!");
 			if(fheight > 0)
 				ff.setVelocity(new Vector(0,speed,0));
 			else ff.setVelocity(new Vector(0,-speed,0));
@@ -443,7 +459,7 @@ public class Plugin extends JavaPlugin implements Listener
 				ff.teleport(fl);
 				atTop = true;
 				Block b = ff.getLocation().getBlock();
-				b.setTypeId(ff.getBlockId());
+				b.setTypeId(ff.getBlockId(), false);
 				b.setData(ff.getBlockData());
 				ff.remove();
 				if(!noPlayer)
@@ -458,10 +474,6 @@ public class Plugin extends JavaPlugin implements Listener
 				Bukkit.getScheduler().cancelTask(id);
 				
 			}
-			/*if(ff.getLocation().getY() < fl.getY() + fheight)
-				return;
-		   	
-		   	Bukkit.getScheduler().cancelTask(id);*/
 		}
 	}
 	
@@ -521,7 +533,7 @@ public class Plugin extends JavaPlugin implements Listener
 			try
 			{
 				player = null;
-				if(l.getBlock().getType() == Material.AIR)
+				if(l.getBlock().getType() == Material.AIR || l.getBlock().getType() == Material.WATER || l.getBlock().getType() == Material.STATIONARY_WATER)
 				{
 					if(!up)
 					{
@@ -613,12 +625,12 @@ public class Plugin extends JavaPlugin implements Listener
                 				try
                 				{
                 					System.out.println("ElevatorChecker started!attempt");
-                					if(p.getLocation().getBlock().getLocation().subtract(0, 1, 0).equals(loc))
+                					if(p.getLocation().getBlock().getLocation().subtract(0, 1, 0).equals(loc) && loc.getBlock().getType() != Material.AIR && loc.getBlock().getType() != Material.LADDER && loc.getBlock().getType() != Material.WOODEN_DOOR && loc.getBlock().getType() != Material.FENCE_GATE && loc.getBlock().getType() != Material.IRON_DOOR && loc.getBlock().getType() != Material.TORCH)
                 					{
                 						//Elevate(loc,height, p, rs.getDouble("speed"));
                 						mountedLocs.add(loc);
                 						//playerMounts.put(loc, p);
-                						System.out.println("ElevatorChecker started!succes");
+                						//System.out.println("ElevatorChecker started!succes");
                 						Elevate(loc, height, p, rs.getDouble("speed"));
                 						p = i.next();
                 					}
@@ -644,6 +656,24 @@ public class Plugin extends JavaPlugin implements Listener
 
                 startZ = Math.min(loc1.getBlockZ(), loc2.getBlockZ());
                 endZ = Math.max(loc1.getBlockZ(), loc2.getBlockZ());
+                
+                for (int x = startX; x <= endX; x++) {
+                    for (int y = startY; y <= endY; y++) {
+                        for (int z = startZ; z <= endZ; z++) 
+                        {
+                        	Location loc = new Location(l.getWorld(), x,y,z);
+                        	try
+                        	{
+                        		if(!mountedLocs.contains(loc) && loc.getBlock().getType() != Material.AIR && (loc.getBlock().getType() == Material.LADDER || loc.getBlock().getType() == Material.WOODEN_DOOR || loc.getBlock().getType() == Material.FENCE_GATE || loc.getBlock().getType() == Material.IRON_DOOR || loc.getBlock().getType() == Material.TORCH))
+                        			Elevate(loc,height, rs.getDouble("speed"));
+                        	}
+                        	catch(Exception e)
+                        	{
+                        		//break;
+                        	}
+                        }
+                    }
+                }   
 
                 for (int x = startX; x <= endX; x++) {
                     for (int y = startY; y <= endY; y++) {
@@ -652,7 +682,7 @@ public class Plugin extends JavaPlugin implements Listener
                         	Location loc = new Location(l.getWorld(), x,y,z);
                         	try
                         	{
-                        		if(!mountedLocs.contains(loc) && loc.getBlock().getType() != Material.AIR)
+                        		if(!mountedLocs.contains(loc) && loc.getBlock().getType() != Material.AIR && loc.getBlock().getType() != Material.LADDER && loc.getBlock().getType() != Material.WOODEN_DOOR && loc.getBlock().getType() != Material.FENCE_GATE && loc.getBlock().getType() != Material.IRON_DOOR && loc.getBlock().getType() != Material.TORCH)
                         			Elevate(loc,height, rs.getDouble("speed"));
                         	}
                         	catch(Exception e)
@@ -663,6 +693,8 @@ public class Plugin extends JavaPlugin implements Listener
                     }
                 }   
 				
+                
+                
 				//player.sendMessage(rs.getInt("type") + "");
 			}
 			catch(Exception e)
