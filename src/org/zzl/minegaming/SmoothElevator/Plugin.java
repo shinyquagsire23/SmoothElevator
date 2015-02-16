@@ -1,17 +1,20 @@
 package org.zzl.minegaming.SmoothElevator;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import net.minecraft.server.v1_6_R1.EntityFallingBlock;
-import net.minecraft.server.v1_6_R1.WorldServer;
+import net.minecraft.server.v1_7_R4.EntityFallingBlock;
+import net.minecraft.server.v1_7_R4.EntityTypes;
+import net.minecraft.server.v1_7_R4.WorldServer;
 
 import org.apache.commons.lang.Validate;
 import org.bukkit.Bukkit;
@@ -21,8 +24,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.craftbukkit.v1_6_R1.CraftWorld;
-import org.bukkit.craftbukkit.v1_6_R1.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_7_R4.CraftWorld;
+import org.bukkit.craftbukkit.v1_7_R4.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -60,7 +63,7 @@ public class Plugin extends JavaPlugin implements Listener
         } catch (Exception e) {
             log.info(e.getMessage());
         }
-        registerEntityType(FloatingBlock.class, "FallingBlock", 21);
+        registerEntityType(NewFloatingBlock.class, "FallingBlock", 21);
         
         Bukkit.getServer().getPluginManager().registerEvents(this, this);
 	}
@@ -82,15 +85,38 @@ public class Plugin extends JavaPlugin implements Listener
             args[1] = String.class;
             args[2] = int.class;
  
-            Method a = net.minecraft.server.v1_6_R1.EntityTypes.class.getDeclaredMethod("a", args);
-            a.setAccessible(true);
- 
-            a.invoke(a, inClass, name, inID);
+            a(inClass, name, inID);
         }
 		catch (Exception e)
 		{
             e.printStackTrace();
         }
+	}
+	
+	/*
+	 * Since 1.7.2 added a check in their entity registration, simply bypass it and write to the maps ourself.
+	 */
+	private static void a(Class paramClass, String paramString, int paramInt)
+	{
+		try
+		{
+			((Map) getPrivateStatic(EntityTypes.class, "c")).put(paramString, paramClass);
+			((Map) getPrivateStatic(EntityTypes.class, "d")).put(paramClass, paramString);
+			((Map) getPrivateStatic(EntityTypes.class, "e")).put(Integer.valueOf(paramInt), paramClass);
+			((Map) getPrivateStatic(EntityTypes.class, "f")).put(paramClass, Integer.valueOf(paramInt));
+			((Map) getPrivateStatic(EntityTypes.class, "g")).put(paramString, Integer.valueOf(paramInt));
+		}
+		catch (Exception exc)
+		{
+			// Unable to register the new class.
+		}
+	}
+	
+	private static Object getPrivateStatic(Class clazz, String f) throws Exception
+	{
+		Field field = clazz.getDeclaredField(f);
+		field.setAccessible(true);
+		return field.get(null);
 	}
 	
 	private boolean setupVaultPermissions() 
@@ -222,7 +248,7 @@ public class Plugin extends JavaPlugin implements Listener
 					World w = Bukkit.getWorld(world);
 					for(Entity e : w.getEntities())
 					{
-						if(e instanceof FloatingBlock || e instanceof EntityFallingBlock)
+						if(e instanceof NewFloatingBlock || e instanceof EntityFallingBlock)
 						{
 							e.eject();
 							e.remove();
@@ -352,7 +378,7 @@ public class Plugin extends JavaPlugin implements Listener
 		
 	}
 
-	public FloatingBlock spawnFallingBlock(Location location, org.bukkit.Material material, byte data) throws IllegalArgumentException {
+	public NewFloatingBlock spawnFallingBlock(Location location, org.bukkit.Material material, byte data) throws IllegalArgumentException {
         Validate.notNull(location, "Location cannot be null");
         Validate.notNull(material, "Material cannot be null");
         Validate.isTrue(material.isBlock(), "Material must be a block");
@@ -364,8 +390,8 @@ public class Plugin extends JavaPlugin implements Listener
         double z = location.getBlockZ() + 0.5;
         WorldServer world = ((CraftWorld)location.getWorld()).getHandle();
 
-        FloatingBlock entity = new FloatingBlock(world, x, y, z, material.getId(), data);
-        entity.c = 1; // ticksLived
+        NewFloatingBlock entity = new NewFloatingBlock(world, x, y, z, net.minecraft.server.v1_7_R4.Block.getById(material.getId()), data);
+        entity.ticksLived = 1;
 
         world.addEntity(entity, SpawnReason.CUSTOM);
         return entity;
@@ -378,7 +404,7 @@ public class Plugin extends JavaPlugin implements Listener
 		Material idd = ol.getBlock().getType();
 		byte data = ol.getBlock().getData();
 		ol.getBlock().setTypeId(0);
-		FloatingBlock f = spawnFallingBlock(l, idd, data);
+		NewFloatingBlock f = spawnFallingBlock(l, idd, data);
 		if(player != null)
 		{
 			//f.setPassenger(player);
@@ -409,7 +435,7 @@ public class Plugin extends JavaPlugin implements Listener
 		Material idd = ol.getBlock().getType();
 		byte data = ol.getBlock().getData();
 		ol.getBlock().setTypeId(0);
-		FloatingBlock f = spawnFallingBlock(l, idd, data);
+		NewFloatingBlock f = spawnFallingBlock(l, idd, data);
 		ElevatorChecker ele = new ElevatorChecker(0,f,height + 1,l);
 		ele.speed = speed;
 		System.out.println(f.getBlockId() + ", " + Material.LADDER.getId());
@@ -420,7 +446,7 @@ public class Plugin extends JavaPlugin implements Listener
 	public class ElevatorChecker implements Runnable 
 	{
 		public int id = 0;
-		FloatingBlock ff;
+		NewFloatingBlock ff;
 		float fheight;
 		Location fl;
 		Player player;
@@ -428,13 +454,13 @@ public class Plugin extends JavaPlugin implements Listener
 		boolean noPlayer = false;
 		double speed = 0.3;
 		
-		public ElevatorChecker(int id, FloatingBlock f, float height, Location l)
+		public ElevatorChecker(int id, NewFloatingBlock f, float height, Location l)
 		{
 			this(id,f,height,l,null);
 			noPlayer = true;
 		}
 		
-		public ElevatorChecker(int id, FloatingBlock f, float height, Location l, Player p)
+		public ElevatorChecker(int id, NewFloatingBlock f, float height, Location l, Player p)
 		{
 			this.id = id;
 			ff = f;
