@@ -12,9 +12,10 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import net.minecraft.server.v1_7_R4.EntityFallingBlock;
-import net.minecraft.server.v1_7_R4.EntityTypes;
-import net.minecraft.server.v1_7_R4.WorldServer;
+import net.milkbowl.vault.permission.Permission;
+import net.minecraft.server.v1_8_R2.EntityFallingBlock;
+import net.minecraft.server.v1_8_R2.EntityTypes;
+import net.minecraft.server.v1_8_R2.WorldServer;
 
 import org.apache.commons.lang.Validate;
 import org.bukkit.Bukkit;
@@ -24,8 +25,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.craftbukkit.v1_7_R4.CraftWorld;
-import org.bukkit.craftbukkit.v1_7_R4.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_8_R2.CraftWorld;
+import org.bukkit.craftbukkit.v1_8_R2.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -48,6 +49,7 @@ public class Plugin extends JavaPlugin implements Listener
 	public static Logger log;
 	public static HashMap<String, Request> requests = new HashMap<String,Request>();
 	public static net.milkbowl.vault.permission.Permission vaultperms = null;
+	public static Permission perms = null;
 	public static Logger logger;
 	
 	public void onEnable()
@@ -66,6 +68,8 @@ public class Plugin extends JavaPlugin implements Listener
         registerEntityType(NewFloatingBlock.class, "FallingBlock", 21);
         
         Bukkit.getServer().getPluginManager().registerEvents(this, this);
+        
+        setupPermissions();
 	}
 	
 	/**
@@ -127,6 +131,13 @@ public class Plugin extends JavaPlugin implements Listener
         return vaultperms != null;
     }
 	
+	private boolean setupPermissions(){
+		
+        RegisteredServiceProvider<Permission> rsp = getServer().getServicesManager().getRegistration(Permission.class);
+        perms = rsp.getProvider();
+		return perms != null;
+	}
+	
 	public boolean hasPermission(Player p, String perm)
 	{
 		if(Bukkit.getServer().getPluginManager().isPluginEnabled("PermissionsEx")){
@@ -143,15 +154,15 @@ public class Plugin extends JavaPlugin implements Listener
 		{
 			try
 			{
-			if(vaultperms.has(p, perm))
+			if(perms.has(p, perm))
 				return true;
 			else
 				return false;
 			}
 			catch(Exception e)
 			{
-				setupVaultPermissions();
-				if(vaultperms.has(p, perm))
+				//setupVaultPermissions();
+				if(perms.has(p, perm))
 					return true;
 				else
 					return false;
@@ -390,7 +401,7 @@ public class Plugin extends JavaPlugin implements Listener
         double z = location.getBlockZ() + 0.5;
         WorldServer world = ((CraftWorld)location.getWorld()).getHandle();
 
-        NewFloatingBlock entity = new NewFloatingBlock(world, x, y, z, net.minecraft.server.v1_7_R4.Block.getById(material.getId()), data);
+        NewFloatingBlock entity = new NewFloatingBlock(world, x, y, z, net.minecraft.server.v1_8_R2.Block.getById(material.getId()).getBlockData(), data);
         entity.ticksLived = 1;
 
         world.addEntity(entity, SpawnReason.CUSTOM);
