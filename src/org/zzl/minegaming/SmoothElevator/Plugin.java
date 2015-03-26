@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 import net.milkbowl.vault.permission.Permission;
 import net.minecraft.server.v1_8_R2.EntityFallingBlock;
 import net.minecraft.server.v1_8_R2.EntityTypes;
+import net.minecraft.server.v1_8_R2.IBlockData;
 import net.minecraft.server.v1_8_R2.WorldServer;
 
 import org.apache.commons.lang.Validate;
@@ -400,8 +401,11 @@ public class Plugin extends JavaPlugin implements Listener
         double y = location.getBlockY() + 1.5;
         double z = location.getBlockZ() + 0.5;
         WorldServer world = ((CraftWorld)location.getWorld()).getHandle();
-
-        NewFloatingBlock entity = new NewFloatingBlock(world, x, y, z, net.minecraft.server.v1_8_R2.Block.getById(material.getId()).getBlockData(), data);
+        
+        IBlockData tempBlock = net.minecraft.server.v1_8_R2.Block.getByCombinedId(material.getId());
+        tempBlock = tempBlock.getBlock().fromLegacyData(data);
+        
+        NewFloatingBlock entity = new NewFloatingBlock(world, x, y, z, tempBlock, data);
         entity.ticksLived = 1;
 
         world.addEntity(entity, SpawnReason.CUSTOM);
@@ -496,8 +500,9 @@ public class Plugin extends JavaPlugin implements Listener
 				ff.teleport(fl);
 				atTop = true;
 				Block b = ff.getLocation().getBlock();
-				b.setTypeId(ff.getBlockId(), false);
-				b.setData(ff.getBlockData());
+				b.setTypeIdAndData(ff.getBlock().getBlock().getId(ff.getBlock().getBlock()), ff.getBlockData(), false);
+				//b.setTypeId(ff.getBlockId(), false);
+				//b.setData(ff.getBlockData());
 				ff.remove();
 				if(!noPlayer)
 				{
